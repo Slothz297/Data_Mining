@@ -1,6 +1,8 @@
 # Data_Mining
 
-Trịnh Á Châu  - Ngô Nhât Minh
+Trịnh Á Châu  - Ngô Nhật Minh
+
+Class: S25-64CNTT
 
 Dataset : 3A Superstore (Market Orders Data-CRM) 
 
