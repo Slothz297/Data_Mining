@@ -26,6 +26,9 @@ def feature_engineering_clv(df: pd.DataFrame,today_date):
 
 
 #Hàm tạo dữ liệu cho mô hình dự đoán doanh thu chi nhánh
+
+
+
 def feature_engineering_branch(df: pd.DataFrame):
     """
     Hàm tạo các đặc trưng thời gian (time-based features) cho mô hình dự đoán doanh thu chi nhánh.

@@ -22,7 +22,7 @@ from src.feature_engineering import feature_engineering_branch
 """
 def model_CLV(rfm: pd.DataFrame, pred_time: int = 4): # Mặc định pred_time sẽ là 12 tuần ( 3 tháng )
     # Mô hình BG-NBD
-    bgf = BetaGeoFitter(penalizer_coef=0.001)
+    bgf = BetaGeoFitter(penalizer_coef=0.1)
     bgf.fit(rfm["frequency"], rfm["recency"], rfm["T"])
 
     # Mô hình GammaGamma
@@ -65,38 +65,35 @@ def model_CLV(rfm: pd.DataFrame, pred_time: int = 4): # Mặc định pred_time
     return result
 
 def model_branch(df,time_pred):
-    all_forecasts = []
-    df_clean = df.copy()
-    df_clean["DATE_"] = pd.to_datetime(df_clean["DATE_"])
-    df_clean["YearMonth"] = df_clean["DATE_"].dt.to_period("M").dt.to_timestamp()  # Gộp theo tháng
-
-    grouped = df_clean.groupby(["BRANCH_ID", "YearMonth"], as_index=False)["TOTALBASKET"].sum()
-    grouped = grouped.rename(columns={"YearMonth": "ds", "TOTALBASKET": "y"})
-
+    all_branch_forecasts = {}
+    data = df.copy()
     # Mô hình Prophet
-    for branch_id in grouped["BRANCH_ID"].unique():
-        df_branch = grouped[grouped["BRANCH_ID"] == branch_id].copy()
+    for branch_id in data['BRANCH_ID'].unique():
+        df_branch = data[data['BRANCH_ID'] == branch_id].copy()
+        df_branch = df_branch.rename(columns={'DATE_': 'ds', 'TOTALBASKET': 'y'})
+        df_branch = df_branch.groupby('ds')['y'].sum().reset_index()
 
-        try:
-            model_prophet = Prophet()
-            model_prophet.fit(df_branch[["ds", "y"]])
+        model_prophet = Prophet()
+        model_prophet.fit(df_branch)
 
-            # Dự đoán thêm theo tháng
-            future = model_prophet.make_future_dataframe(periods=time_pred, freq="M")
-            forecast = model_prophet.predict(future)
+        #predicting the total basket 1 month ahead
+        future = model_prophet.make_future_dataframe(periods= time_pred, freq='M')
+        forecast = model_prophet.predict(future)
+        all_branch_forecasts[branch_id] = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
-            forecast["BRANCH_ID"] = branch_id
-            forecast = forecast[["BRANCH_ID", "ds", "yhat", "yhat_lower", "yhat_upper"]]
-            all_forecasts.append(forecast)
+    #Gộp dữ liệu vào dataframe
 
-        except Exception as e:
-            print(f"Lỗi tại chi nhánh {branch_id}: {e}")
+    all_branch_forecasts_df = pd.concat(
+        [forecast.assign(BRANCH_ID=branch_id) for branch_id, forecast in all_branch_forecasts.items()],
+        ignore_index=True)[['BRANCH_ID', 'ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
-    if all_forecasts:
-        combined_forecast = pd.concat(all_forecasts, ignore_index=True)
-    else:
-        combined_forecast = pd.DataFrame(columns=["BRANCH_ID", "ds", "yhat", "yhat_lower", "yhat_upper"])
-        
+    """
+        - ds: Mốc thời gian
+        - yhat: Dự đoán trung bình
+        - yhat_lower: Giới hạn dưới (95%)
+        - yhat_upper: Giới hạn trên (95%)
+    """
+
     #Mô hình XGBoost
 
     #Cắt bộ dữ liệu theo thời gian dự đoán
@@ -124,12 +121,11 @@ def model_branch(df,time_pred):
 
     #Predict
     y_pred = model_xgb.predict(x_test)
-
     result = {
         "prophet": model_prophet,
         "xbg": model_xgb,
-        "branch_forecast": combined_forecast,
-        "X_test": x_test,
+        "branch_forecast": all_branch_forecasts_df,
+        "x_test": test,
         "y_test": y_test,
         "y_pred":y_pred
     }

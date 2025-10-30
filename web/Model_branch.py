@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-
 from src.model_training import model_branch
 from src.evaluation import evaluation_prophet, evaluation_xgb
 from src.preprocessing import preprocess_data_branch
+
 
 def run():
     st.markdown(
@@ -22,6 +22,7 @@ def run():
 
     df = st.session_state.df
     st.dataframe(df.head(500), use_container_width=True, height=350)
+    st.caption(f"Kích thước: {df.shape[0]} x {df.shape[1]}")
 
     st.markdown("### Tham số mô hình")
     time_pred = st.number_input("Số tháng dự đoán", min_value=1, max_value=12, value=1, step=1)
@@ -33,22 +34,28 @@ def run():
             all_branch_forecasts = result["branch_forecast"]
             y_test = result["y_test"]
             y_pred = result["y_pred"]
+            x_test = result["x_test"]
 
-        st.success("✅ Đã huấn luyện xong cả hai mô hình!")
+        st.success("Đã huấn luyện mô hình xong!")
+
+        st.markdown ("### Dữ liệu sau khi đã xử lý")
+        st.dataframe(df_clean, use_container_width=True, height=350)
+        st.caption(f"Kích thước sau tiền xử lý: {df_clean.shape[0]} x {df_clean.shape[1]}")
 
         # Prophet
         st.markdown("Kết quả dự đoán bằng Prophet")
+    
 
-        if not combined_forecast.empty:
-            st.caption(f"Tổng số bản ghi dự đoán: {len(combined_forecast):,}")
+        if not all_branch_forecasts.empty:
             st.dataframe(
-                combined_forecast.head(1000),
+                all_branch_forecasts.head(1000),
                 use_container_width=True,
                 height=400
             )
+            st.caption(f"Tổng số bản ghi dự đoán: {len(all_branch_forecasts):,}")
 
             with st.spinner("🔍 Đang đánh giá mô hình Prophet..."):
-                prophet_eval = evaluation_prophet(df_clean, combined_forecast)
+                prophet_eval = evaluation_prophet(df_clean, all_branch_forecasts)
 
             st.markdown("Đánh giá mô hình Prophet")
             st.dataframe(prophet_eval, use_container_width=True, height=300)
@@ -68,10 +75,12 @@ def run():
         st.markdown("---")
         st.subheader("Kết quả dự đoán bằng XGBoost")
         df_compare = pd.DataFrame({
-            "Thực tế": y_test.values,
-            "Dự đoán": y_pred
+            "BRANCH_ID":x_test['BRANCH_ID'],
+            "Month": x_test["DATE_"],
+            "y_test": y_test.values,
+            "y_pred": y_pred
         })
         st.dataframe(df_compare.tail(200), use_container_width=True, height=300)
 
         xgb_eval = evaluation_xgb(y_test, y_pred)
-        st.dataframe(xgb_eval, use_container_width=True, height=200)
+        st.dataframe(xgb_eval, use_container_width=True, height=150)

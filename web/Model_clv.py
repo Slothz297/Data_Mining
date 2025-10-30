@@ -23,6 +23,7 @@ def run():
 
     df = st.session_state.df
     st.dataframe(df.head(500), use_container_width=True, height=360)
+    st.caption(f"Kích thước: {df.shape[0]} x {df.shape[1]}")
 
     col1, col2 = st.columns(2)
     today = col1.date_input(
@@ -45,11 +46,18 @@ def run():
             segment_summary = eval_result["segment_summary"]
 
         st.success("✅ Hoàn tất dự đoán")
+
+        st.markdown("### Dữ liệu sau khi đã tiền xử lý")
+        st.dataframe(df_clean.head(500), use_container_width=True, height=360)
+        st.caption(f"Kích thước sau tiền xử lý: {df_clean.shape[0]} x {df_clean.shape[1]}")
+
         st.subheader("Kết quả dự đoán CLV")
         st.dataframe(customer_table.head(200), use_container_width=True, height=400)
 
+        st.caption(f"Kích thước bảng khách hàng: {customer_table.shape[0]} x {customer_table.shape[1]}")
+
         st.subheader("Thống kê cụm khách hàng")
-        st.dataframe(segment_summary, use_container_width=True, height=260)
+        st.dataframe(segment_summary, use_container_width=True, height=180)
 
         st.subheader("Đánh giá mô hình CLV")
-        st.json(metrics)
+        st.dataframe(metrics, use_container_width=True, height=150)

@@ -9,19 +9,17 @@ def evaluation_clv(rfm, clusters):
     rmse = root_mean_squared_error(rfm["monetary"], rfm["predicted_monetary"])
     r2 = r2_score(rfm["monetary"], rfm["predicted_monetary"])
 
-    metrics = {
-        "MAE": round(mae, 4),
-        "RMSE": round(rmse, 4),
-        "R2": round(r2, 4)
-    }
-
+    metrics =  pd.DataFrame({
+        "Metric": ["MAE", "RMSE", "R2"],
+        "Value": [round(mae, 4), round(rmse, 4), round(r2, 4)]
+    })
     # Bảng thống kê các cụm
     segment_summary = clusters[["segment", "avg_CLV", "n_customers", "percent_customers"]].copy()
     segment_summary.columns = ["Phân khúc", "CLV trung bình", "Số khách hàng", "Tỷ lệ (%)"]
 
     # Phân khúc khách hàng   
-    customer_table = rfm[["USERID", "frequency", "recency", "monetary", "CLV", "customer_category"]].copy()
-    customer_table.columns = ["ID", "Frequency", "Recency", "Monetary", "CLV dự đoán", "Loại"]
+    customer_table = rfm[["USERID", "frequency", "recency", "monetary","predicted_frequency", "predicted_monetary",  "CLV", "customer_category"]].copy()
+    customer_table.columns = ["ID", "Frequency", "Recency", "Monetary","Frequency_avg dự đoán","Monetary_avg dự đoán", "CLV dự đoán", "Hạng khách hàng"]
 
     result = {
         "metrics": metrics,
@@ -42,10 +40,10 @@ def evaluation_prophet(df, all_branch_forecasts):
     ).rename(columns={"YearMonth": "ds", "TOTALBASKET": "y"})
 
     # Mô hình Prophet
-    for branch_id in combined_forecast["BRANCH_ID"].unique():
+    for branch_id in all_branch_forecasts["BRANCH_ID"].unique():
         try:
             df_branch_actual = actual_grouped[actual_grouped["BRANCH_ID"] == branch_id]
-            df_branch_pred = combined_forecast[combined_forecast["BRANCH_ID"] == branch_id]
+            df_branch_pred = all_branch_forecasts[all_branch_forecasts["BRANCH_ID"] == branch_id]
 
             merged = pd.merge(df_branch_actual, df_branch_pred, on=["BRANCH_ID", "ds"], how="inner")
 
@@ -78,7 +76,6 @@ def evaluation_xgb(y_test, y_pred):
 
     # Tạo dataframe hiển thị
     result = pd.DataFrame({
-        "Model": ["XGBRegressor"],
         "Metric": ["MAE", "RMSE", "R2"],
         "Value": [round(mae, 4), round(rmse, 4), round(r2, 4)]
     })
