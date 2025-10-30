@@ -1,4 +1,4 @@
-## 3A Retail CLV & Branch Forecasting
+## **3A Retail CLV & Branch Forecasting**
 
 Dự án **dự đoán chi tiêu khách hàng (Customer Lifetime Value – CLV)**, **phân loại khách hàng theo nhóm chi tiêu**, và **dự đoán doanh thu cho từng chi nhánh** dựa trên bộ dữ liệu **3A Superstore** – một tập dữ liệu mô phỏng về chuỗi siêu thị bán lẻ tại Thổ Nhĩ Kỳ (dữ liệu giả lập, không phải dữ liệu thật).
 
@@ -12,7 +12,7 @@ Link: **https://www.kaggle.com/datasets/cemeraan/3a-superstore**
 
 ---
 
-## === Tổng quan ===
+## **Tổng quan**
 Dự án được xây dựng bằng **Python** và **Streamlit**, cho phép hiển thị giao diện web trực quan phục vụ phân tích dữ liệu, huấn luyện mô hình, và hiển thị kết quả dự báo.
 
 Bộ dữ liệu mẫu nằm trong thư mục `data/`, gồm:
@@ -22,7 +22,8 @@ Bộ dữ liệu mẫu nằm trong thư mục `data/`, gồm:
 > **Lưu ý:** Để sử dụng dữ liệu gốc, hãy giải nén các file `.zip` và chọn bộ dữ liệu gốc tại trang đầu tiên của web.
 
 ---
-## === Cấu trúc thư mục ===
+## **Cấu trúc thư mục**
+```bash
 project/
 │
 ├── data/
@@ -47,9 +48,9 @@ project/
 ├── Report.pdf                 # Báo cáo tổng hợp kết quả
 ├── requirements.txt           # Thư viện cài đặt
 └── README.md
-
+```
 ---
-## === Hướng dẫn cài đặt ===
+## **Hướng dẫn cài đặt**
 
 Streamlit là thư viện mã nguồn mở của Python giúp tạo ứng dụng web tương tác cho các dự án Machine Learning, Data Science mà không cần biết HTML/CSS/JS
 
@@ -68,7 +69,7 @@ Phiên bản Python ≥ 3.8
 Tải phiên bản **[Python mới nhất](https://www.python.org/downloads/)**
 
 ---
-### Windows:
+### **Windows**
 Kiểm tra phiên bản python
 ```bash
 python --version
@@ -95,7 +96,7 @@ streamlit run main.py
 Sau khi chạy lệnh sẽ đưa link web có dạng localhost:8501
 
 ---
-###Linux/macOs
+### **Linux/macOS**
 
 Kiểm tra phiên bản python
 ```bash
@@ -135,7 +136,7 @@ Sau khi chạy lệnh sẽ đưa link web có dạng localhost:8501
 
 ---
 
-### Lincse
+## **Lincse**
 Dự án này được phát hành theo giấy phép [MIT License](https://opensource.org/licenses/MIT).
 
 
