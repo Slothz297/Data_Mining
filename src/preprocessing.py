@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 
 #Tiền xử lý dữ liệu
 
@@ -23,3 +23,24 @@ def preprocess_data_clv(df):
     df_clean = df_clean[df_clean['TOTALBASKET'] <= upper]
 
     return df_clean
+
+def preprocess_data_branch(df):
+    data_clean = df.copy()
+    #Loại bỏ các cột không cần thiết
+    drop_cols = [col for col in ['NAMESURNAME', 'USERID', 'ORDERID'] if col in data_clean.columns]
+    if drop_cols:
+        data_clean = data_clean.drop(columns=drop_cols)
+
+    # Chuyển định dạng ngày
+    data_clean['DATE_'] = pd.to_datetime(data_clean['DATE_'])
+
+    data_clean["TOTALBASKET"] = data_clean["TOTALBASKET"].str.replace(",", ".").astype(float)
+
+    #Xử lý ngoại lệ
+    q99 = np.percentile(data_clean['TOTALBASKET'].dropna(), 99, interpolation='midpoint')
+    data_clean = data_clean[data_clean['TOTALBASKET'] < q99]
+
+    #Dọn dữ liệu bị NULL
+    data_clean = data_clean.dropna(subset=['TOTALBASKET', 'DATE_'], how='any')
+
+    return data_clean

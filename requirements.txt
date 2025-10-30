@@ -1,10 +1,23 @@
-streamlit
+# Core
 pandas
 numpy
 matplotlib
 seaborn
+datetime
+
+# Machine Learning & Statistical Models
 scikit-learn
-lifetimes
 xgboost
+lifetimes
 prophet
+
+# Web App
+streamlit
+
+# Visualization (EDA + UI)
 plotly
+altair
+yellowbrick
+
+# Utility & Serialization
+dill

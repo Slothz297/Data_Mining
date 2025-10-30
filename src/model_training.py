@@ -1,18 +1,137 @@
-import dill
+import pandas as pd
+import numpy as np
+from lifetimes import BetaGeoFitter
+from lifetimes import GammaGammaFitter
+from sklearn.cluster import KMeans
+from prophet import Prophet
+from xgboost import XGBRegressor
+from src.feature_engineering import feature_engineering_branch
 
-with open("models/clv_models.pkl", "rb") as f:
-    models = dill.load(f)
+#Mô hình dự đoán CLV của khách hàng
+"""
+    Hàm này thưc hiện:
+    - Training mô hình BG-NBD
+    - Training mô hình Gamma Gamma
+    - Thực hiện dự đoán để tính CLV
+    - Phân loại khách hàng dựa vào CLV
 
-bgf = models["bgf"]
-ggf = models["ggf"]
+    Kết quả trả về:
+    - Mô hình BG-NBD
+    - Mô hình Gamma Gamma
+    - Bảng dự đoán CLV của khách hàng và phân loại khách hàng
+"""
+def model_CLV(rfm: pd.DataFrame, pred_time: int = 4): # Mặc định pred_time sẽ là 12 tuần ( 3 tháng )
+    # Mô hình BG-NBD
+    bgf = BetaGeoFitter(penalizer_coef=0.001)
+    bgf.fit(rfm["frequency"], rfm["recency"], rfm["T"])
 
-with open("models/clv_models.pkl", "wb") as f:
-    dill.dump(models, f)
+    # Mô hình GammaGamma
+    ggf = GammaGammaFitter(penalizer_coef = 0.01)
+    # Fitting dữ liệu cho model với frequency và monetary
+    ggf.fit(rfm["frequency"], rfm["monetary"])
 
-def model_training(df_clv):
-    """Huấn luyện mô hình CLV (BG/NBD + GammaGamma)."""
-    bgf.fit(df_clv['frequency'], df_clv['recency'], df_clv['T'])
-    ggf.fit(df_clv['frequency'], df_clv['monetary'])
+    # Thực hiện dự đoán
+    rfm["predicted_frequency"] = bgf.predict(pred_time, rfm["frequency"], rfm["recency"], rfm["T"])
+    rfm["predicted_monetary"] = ggf.conditional_expected_average_profit(rfm["frequency"], rfm["monetary"])
+    rfm["CLV"] = rfm["predicted_frequency"] * rfm["predicted_monetary"]
 
-    return bgf, ggf
 
+    #Phân loại khách hàng bằng K-Mean
+    X = rfm[["CLV"]].values 
+    km_model = KMeans(n_clusters=4, random_state=42, n_init=10)
+    km_model.fit(X)
+    rfm["cluster"] = km_model.labels_
+
+    #Tính các giá trị CLV của từng cụm và thông số về % của từng cụm
+    df_clusters = rfm.groupby("cluster")["CLV"].agg(["mean", "count"]).reset_index()
+    df_clusters.columns = ["cluster", "avg_CLV", "n_customers"]
+    df_clusters["percent_customers"] = (df_clusters["n_customers"] / df_clusters["n_customers"].sum() * 100).round(2)
+
+    #Gán nhãn cho từng cụm
+    df_clusters = df_clusters.sort_values("avg_CLV", ascending=True).reset_index(drop=True)
+    labels = ["Bronze", "Silver", "Gold", "Diamond"]
+    df_clusters["segment"] = labels[:len(df_clusters)]
+
+    #Dán lại các nhãn cho bộ dự liệu chính
+    mapping = dict(zip(df_clusters["cluster"], df_clusters["segment"]))
+    rfm["customer_category"] = rfm["cluster"].map(mapping)
+
+    result = {
+    "bgf":bgf,
+    "ggf":ggf,
+    "df_result": rfm,
+    "clusters": df_clusters
+    }
+    return result
+
+def model_branch(df,time_pred):
+    all_forecasts = []
+    df_clean = df.copy()
+    df_clean["DATE_"] = pd.to_datetime(df_clean["DATE_"])
+    df_clean["YearMonth"] = df_clean["DATE_"].dt.to_period("M").dt.to_timestamp()  # Gộp theo tháng
+
+    grouped = df_clean.groupby(["BRANCH_ID", "YearMonth"], as_index=False)["TOTALBASKET"].sum()
+    grouped = grouped.rename(columns={"YearMonth": "ds", "TOTALBASKET": "y"})
+
+    # Mô hình Prophet
+    for branch_id in grouped["BRANCH_ID"].unique():
+        df_branch = grouped[grouped["BRANCH_ID"] == branch_id].copy()
+
+        try:
+            model_prophet = Prophet()
+            model_prophet.fit(df_branch[["ds", "y"]])
+
+            # Dự đoán thêm theo tháng
+            future = model_prophet.make_future_dataframe(periods=time_pred, freq="M")
+            forecast = model_prophet.predict(future)
+
+            forecast["BRANCH_ID"] = branch_id
+            forecast = forecast[["BRANCH_ID", "ds", "yhat", "yhat_lower", "yhat_upper"]]
+            all_forecasts.append(forecast)
+
+        except Exception as e:
+            print(f"Lỗi tại chi nhánh {branch_id}: {e}")
+
+    if all_forecasts:
+        combined_forecast = pd.concat(all_forecasts, ignore_index=True)
+    else:
+        combined_forecast = pd.DataFrame(columns=["BRANCH_ID", "ds", "yhat", "yhat_lower", "yhat_upper"])
+        
+    #Mô hình XGBoost
+
+    #Cắt bộ dữ liệu theo thời gian dự đoán
+    latest_date = df['DATE_'].max()
+    split_date = latest_date - pd.DateOffset(months=time_pred)
+
+    #Chia bộ dữ liệu
+    train = df[df['DATE_'] < split_date].reset_index(drop=True)
+    test = df[df['DATE_'] >= split_date].reset_index(drop=True)
+
+    #thực hiện feature_engineering
+    x_train = feature_engineering_branch(train)
+    y_train = train['TOTALBASKET']
+    x_test = feature_engineering_branch(test)
+    y_test = test['TOTALBASKET']
+
+    #Training model
+    model_xgb = XGBRegressor(n_estimators=1000)
+    model_xgb.fit(
+        x_train,
+        y_train,
+        eval_set=[(x_test, y_test)],
+        verbose=False
+    )
+
+    #Predict
+    y_pred = model_xgb.predict(x_test)
+
+    result = {
+        "prophet": model_prophet,
+        "xbg": model_xgb,
+        "branch_forecast": combined_forecast,
+        "X_test": x_test,
+        "y_test": y_test,
+        "y_pred":y_pred
+    }
+
+    return result

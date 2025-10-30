@@ -34,17 +34,12 @@ def eda(df: pd.DataFrame):
     columns = list(df.columns)
 
     # === 5. Quantiles (describe) ===
-    describe_df = df.describe().T
+    describe_df = df.describe(include = "all").T
 
     # === 6. Missing values ===
     nulls = df.isnull().sum().reset_index()
     nulls.columns = ['Column', 'MissingCount']
     nulls['MissingPercent'] = (nulls['MissingCount'] / len(df) * 100).round(2)
-
-    # === 7. Biểu đồ trực quan hóa (nếu muốn dùng Streamlit plot) ===
-    fig, ax = plt.subplots(figsize=(6, 3))
-    sns.heatmap(df.isnull(), cbar=False, yticklabels=False, cmap="viridis", ax=ax)
-    plt.title("Missing Values Map")
 
     # === 8. Kết quả trả về ===
     result = {
@@ -55,6 +50,5 @@ def eda(df: pd.DataFrame):
         "columns": columns,
         "describe": describe_df,
         "missing": nulls,
-        "missing_plot": fig
     }
     return result
